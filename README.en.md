@@ -27,7 +27,7 @@ Changing a preset changes styling, not the order, amounts, or uploaded artwork. 
 ## Download and install
 
 1. Open [Releases](https://github.com/Charlie-chulong/receipt-studio-desktop/releases/latest).
-2. Download `小票工坊-1.0.0-安装包.exe`, or the share ZIP containing the installer, documentation in all three languages, and license files.
+2. Download `Receipt-Studio-1.0.0-Setup.exe`, or the share ZIP containing the installer, documentation in all three languages, and license files.
 3. Run the installer on Windows x64, choose an installation directory, and launch “小票工坊”.
 
 The installer includes the runtime. Normal use does not require Node.js, npm, or Git. The first public installer is not code-signed, so Windows may warn about an unknown publisher. Download from this repository's Releases and compare the file hash with `SHA256SUMS.txt`; do not disable security protection to install it.

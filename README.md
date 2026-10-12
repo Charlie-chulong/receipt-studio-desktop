@@ -27,7 +27,7 @@ Windows 桌面结单小票工具：填写或粘贴订单，调整可爱主题与
 ## 下载与安装
 
 1. 打开 [Releases](https://github.com/Charlie-chulong/receipt-studio-desktop/releases/latest)。
-2. 下载 `小票工坊-1.0.0-安装包.exe`，或下载包含安装包、三种语言说明和授权文件的分享 ZIP。
+2. 下载 `Receipt-Studio-1.0.0-Setup.exe`，或下载包含安装包、三种语言说明和授权文件的分享 ZIP。
 3. 在 Windows x64 上运行安装包，选择安装目录，完成后打开“小票工坊”。
 
 安装包包含运行环境，普通使用不需要 Node.js、npm 或 Git。首次公开发布的安装包未做代码签名；Windows 可能提示来源未知。请从本仓库的 Releases 下载，并与发布页的 `SHA256SUMS.txt` 核对文件哈希，不要为了安装而关闭安全防护。

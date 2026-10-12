@@ -51,7 +51,7 @@
         }
       ],
       "icon": "build/icon.png",
-      "artifactName": "小票工坊-${version}-安装包.${ext}"
+      "artifactName": "Receipt-Studio-${version}-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
