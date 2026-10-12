@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>小票工坊 · 离线结单工作台</title>
+</head>
+<body>
+  <header class="window-titlebar" aria-label="窗口标题栏"><div class="window-titlebar-content"><i data-icon="receipt-text"></i><span>小票工坊</span><small>离线结单工作台</small></div></header>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark"><i data-icon="receipt-text"></i></span><div><h1>小票工坊</h1><p>把每一笔认真，留在纸上。</p></div></div>
+    <div class="top-actions">
+      <span class="offline-badge" role="note" title="无需联网，即可制作、编辑和导出小票。订单内容、图片素材与设计文件均在当前电脑中处理，软件不会将这些内容上传至服务器。" aria-label="本地运行，订单不上传。订单、图片与设计文件仅在本机处理。"><i data-icon="shield-check"></i>本地运行 · 订单不上传</span>
+      <button id="about-button" class="quiet"><i data-icon="circle-user-round"></i>关于作者</button>
+      <button id="load-design"><i data-icon="folder-open"></i>载入设计</button>
+      <button id="save-design"><i data-icon="file-down"></i>保存设计</button>
+      <button id="export-png" class="primary" disabled><i data-icon="image-down"></i><span>导出 PNG</span></button>
+    </div>
+  </header>
+  <main class="workbench">
+    <aside class="editor" aria-label="小票编辑器">
+      <div class="editor-intro"><div><p class="eyebrow">YOUR RECEIPT, YOUR WAY</p><h2>今天，也认真结单。</h2></div><span class="step-label">编辑 / 01</span></div>
+      <div class="editor-scroll">
+        <button id="extract-button" class="extract-button"><i data-icon="clipboard-list"></i><span><strong>从订单文字开始</strong><small>粘贴聊天记录，确认后填入</small></span><i data-icon="arrow-up-right"></i></button>
+        <section class="editor-section">
+          <div class="section-heading"><h3><i data-icon="notebook-pen"></i>结单信息</h3><span>01</span></div>
+          <label>小票标题<input data-field="title" maxlength="200"></label>
+          <label>副标题<input data-field="subtitle" maxlength="200" placeholder="俱乐部名称或一句问候"></label>
+          <p class="helper">上方虚线框可修改字段名称，下方填写内容；名称会用于小票预览、导出和设计保存。</p>
+          <div class="field-grid">
+            <div class="custom-field"><input class="field-name" data-field="fieldLabels.bossId" maxlength="40" aria-label="老板 / 客户字段名称"><input data-field="bossId" data-custom-label="bossId" maxlength="200" placeholder="填写真实客户"></div>
+            <div class="custom-field"><input class="field-name" data-field="fieldLabels.accountNumber" maxlength="40" aria-label="账户 / 编号字段名称"><input data-field="accountNumber" data-custom-label="accountNumber" maxlength="200"></div>
+          </div>
+          <div class="field-grid">
+            <div class="custom-field"><input class="field-name" data-field="fieldLabels.game" maxlength="40" aria-label="游戏 / 服务字段名称"><input data-field="game" data-custom-label="game" maxlength="200"></div>
+            <div class="custom-field"><input class="field-name" data-field="fieldLabels.dispatcher" maxlength="40" aria-label="派单客服字段名称"><input data-field="dispatcher" data-custom-label="dispatcher" maxlength="200"></div>
+          </div>
+          <label>开始时间<input data-field="startedAt" type="datetime-local"></label>
+          <label>结单时间<input data-field="issuedAt" type="datetime-local"></label>
+          <label>支付方式<input data-field="paymentMethod" maxlength="200" list="payment-options" placeholder="留空或填写实际方式"></label>
+          <datalist id="payment-options"><option value="微信支付"></option><option value="支付宝"></option><option value="现金"></option><option value="其他"></option></datalist>
+        </section>
+        <section class="editor-section">
+          <div class="section-heading"><h3><i data-icon="list-plus"></i>服务明细</h3><span id="item-count">1 / 80</span></div>
+          <p class="helper">每行填写该项目的总价，不额外乘时长或数量。</p>
+          <div id="item-list"></div>
+          <button id="add-item" class="wide dashed"><i data-icon="plus"></i>添加一项</button>
+        </section>
+        <section class="editor-section">
+          <div class="section-heading"><h3><i data-icon="calculator"></i>费用与顺序</h3><span>03</span></div>
+          <div class="fee-row"><label class="check"><input data-field="fees.rushEnabled" type="checkbox">加急费用</label><label class="compact">倍率<input data-field="fees.rushMultiplier" inputmode="decimal" aria-label="加急倍率"><span>倍，至少 1</span></label></div>
+          <div class="fee-row"><label class="check"><input data-field="fees.discountEnabled" type="checkbox">折扣</label><label class="compact">折数<input data-field="fees.discountRate" inputmode="decimal" aria-label="折扣折数"><span>折，0–10</span></label></div>
+          <label class="check precedence"><input data-field="fees.discountBeforeRush" type="checkbox">折扣先于加急（加急仍按原价计算）</label>
+          <label>优惠 / 减免金额<div class="money-input"><span>¥</span><input data-field="fees.couponAmount" inputmode="decimal" aria-label="优惠金额"></div></label>
+          <label class="check precedence"><input data-field="fees.couponBeforeDiscount" type="checkbox">优惠先于折扣</label>
+        </section>
+        <section class="editor-section">
+          <div class="section-heading"><h3><i data-icon="palette"></i>纸张与字体</h3><span>04</span></div>
+          <fieldset class="theme-choices"><legend>可爱预设主题</legend><div id="theme-options" class="theme-options"></div></fieldset>
+          <p class="helper">切换主题会应用配色、字体和纸张轮廓，不改变订单、费用或已上传的图片。应用后仍可调整下方样式。</p>
+          <label>纸张轮廓<select data-field="shape"><option value="default">直边纸张</option><option value="notch">票根缺口</option><option value="tag">挂牌票签</option><option value="waist">收腰纸条</option><option value="arch">拱顶纸张</option><option value="stamp">邮票齿边</option><option value="chamfer">切角纸张</option></select></label>
+          <label>本机字体<select data-field="font"><option value="Microsoft YaHei">微软雅黑 · 清晰日常</option><option value="SimSun">宋体 · 经典印刷</option><option value="KaiTi">楷体 · 手写心意</option></select></label>
+          <p class="helper">预设默认使用微软雅黑，适合清晰阅读；宋体和楷体可手动选择，笔画会更细。</p>
+          <div class="field-grid color-fields"><label>纸张颜色<input type="color" data-field="paperColor"></label><label>点缀颜色<input type="color" data-field="accentColor"></label></div>
+        </section>
+        <section class="editor-section">
+          <div class="section-heading"><h3><i data-icon="image-plus"></i>图片与装饰</h3><span>05</span></div>
+          <p class="helper">只读取本机 PNG / JPG / WebP。图片、设计和订单不会上传。</p>
+          <div class="asset-row"><div><strong>抬头图片 / Logo</strong><small id="logo-status">未添加</small></div><button data-upload="logo" aria-label="选择抬头图片"><i data-icon="upload"></i></button><button data-remove-asset="logo" aria-label="移除抬头图片"><i data-icon="x"></i></button></div>
+          <div class="asset-row"><div><strong>底部图片</strong><small id="footerImage-status">未添加</small></div><button data-upload="footerImage" aria-label="选择底部图片"><i data-icon="upload"></i></button><button data-remove-asset="footerImage" aria-label="移除底部图片"><i data-icon="x"></i></button></div>
+          <div class="asset-row"><div><strong>纸张背景</strong><small id="background-status">未添加</small></div><button data-upload="background" aria-label="选择背景图片"><i data-icon="upload"></i></button><button data-remove-asset="background" aria-label="移除背景图片"><i data-icon="x"></i></button></div>
+          <div id="background-controls" class="adjustments">
+            <label>背景缩放<output data-output="background.scale"></output><input data-field="background.scale" type="range" min="0.25" max="3" step="0.01"></label>
+            <label>背景不透明度<output data-output="background.opacity"></output><input data-field="background.opacity" type="range" min="0" max="1" step="0.01"></label>
+            <label>背景左右位置<output data-output="background.offsetX"></output><input data-field="background.offsetX" type="range" min="-1" max="1" step="0.01"></label>
+            <label>背景上下位置<output data-output="background.offsetY"></output><input data-field="background.offsetY" type="range" min="-1" max="1" step="0.01"></label>
+          </div>
+          <div class="sticker-heading"><strong>自由贴纸</strong><span id="sticker-count">0 / 30</span></div>
+          <div id="sticker-list"></div>
+          <button data-upload="sticker" id="add-sticker" class="wide dashed"><i data-icon="plus"></i>从本机添加贴纸</button>
+          <p class="helper">横纵位置按整张纸的比例定位；用滑杆移动、缩放和旋转。下方贴纸显示在上方贴纸之上。</p>
+        </section>
+        <section class="editor-section">
+          <div class="section-heading"><h3><i data-icon="message-square-text"></i>备注与落款</h3><span>06</span></div>
+          <label class="check"><input data-field="showNote" type="checkbox">在小票中显示备注</label>
+          <label>订单备注<textarea data-field="note" maxlength="4000" rows="4" placeholder="需要向客户说明的内容"></textarea></label>
+          <label>底部落款<input data-field="footer" maxlength="200" placeholder="一句感谢，或留空"></label>
+        </section>
+        <div class="editor-bottom"><button id="reset-receipt" class="quiet danger"><i data-icon="rotate-ccw"></i>清空，重新开始</button><p>本机自动保存不等于备份。重要设计请另存 JSON。</p></div>
+      </div>
+      <div class="save-state"><i data-icon="hard-drive"></i><span id="save-status" role="status">正在读取本机草稿…</span></div>
+    </aside>
+    <section class="preview-panel" aria-label="完整小票预览">
+      <div class="preview-heading"><div><p class="eyebrow">PAPER PREVIEW</p><h2>一张属于你的结单。</h2></div><span class="preview-label"><i data-icon="scan-line"></i>完整纸张 · 1080px</span></div>
+      <div class="preview-stage" id="preview-stage"><div class="paper-wrap"><span class="paper-tape" aria-hidden="true"></span><canvas id="receipt-preview" aria-label="小票完整预览" role="img"></canvas></div><div id="preview-state" class="preview-state" role="status">正在准备纸张…</div></div>
+      <div class="calculation-summary"><div class="summary-main"><div><span>最终金额</span><strong id="total-amount">—</strong></div><span id="render-status" role="status">准备中</span></div><div id="amount-breakdown" class="amount-breakdown"></div><p id="formula"></p><p id="validation-error" class="error" role="alert" hidden></p></div>
+    </section>
+  </main>
+  <div id="notification" class="notification" role="status" hidden></div>
+  <input id="design-file" type="file" accept="application/json,.json" hidden>
+  <input id="image-file" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+  <dialog id="extract-dialog" aria-labelledby="extract-title">
+    <div class="dialog-heading"><div><p class="eyebrow">PASTE & REVIEW</p><h2 id="extract-title">从文字提取订单</h2></div><button data-close-dialog="extract-dialog" class="icon-button" aria-label="关闭文字提取"><i data-icon="x"></i></button></div>
+    <p class="helper">只提取明确的字段和行总价。不会推断已支付；请在应用前逐项确认。</p>
+    <section class="order-example" aria-label="订单文字示例">
+      <div class="order-example-heading"><strong>可以这样写</strong><button id="fill-order-example" type="button">填入示例</button></div>
+      <pre id="order-example-text">老板：小葵
+游戏：三角洲行动
+客服：阿梨
+开始时间：2026-10-13 12:43
+结单时间：2026-10-13 14:43
+三角洲护航 2小时 168元
+指定陪玩 晚间档 66元
+优惠18元
+微信支付</pre>
+      <p class="helper">仅演示格式，非真实订单。每项行末写总价并带“元”；时间使用“开始时间／结单时间：YYYY-MM-DD HH:mm”，留空不会自动填入。“微信支付”只表示支付方式，不代表已付款。</p>
+    </section>
+    <label>原始订单文字<textarea id="order-text" rows="7" maxlength="20000" placeholder="粘贴真实订单或聊天记录"></textarea></label>
+    <button id="parse-text"><i data-icon="scan-text"></i>提取并预览</button>
+    <div id="parse-result" class="parse-result" hidden><h3>待应用的内容</h3><div id="candidate-fields"></div><ul id="candidate-items"></ul><p id="candidate-total"></p><div id="parse-warnings"></div></div>
+    <p id="parse-error" class="error" role="alert" hidden></p>
+    <div class="dialog-actions"><button data-close-dialog="extract-dialog">取消</button><button id="apply-candidate" class="primary" disabled>确认，应用这些内容</button></div>
+  </dialog>
+  <dialog id="reset-dialog" aria-labelledby="reset-title"><div class="dialog-heading"><h2 id="reset-title">重新开始一张小票？</h2><button data-close-dialog="reset-dialog" class="icon-button" aria-label="关闭重置确认"><i data-icon="x"></i></button></div><p>当前订单和图片将被清空。请先保存设计 JSON，保留需要的内容。</p><div class="dialog-actions"><button data-close-dialog="reset-dialog">保留当前内容</button><button id="confirm-reset" class="primary">确认清空</button></div></dialog>
+  <dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-heading"><div><p class="eyebrow">BEHIND THE PAPER</p><h2 id="about-title">关于作者</h2></div><button data-close-dialog="about-dialog" class="icon-button" aria-label="关闭关于作者"><i data-icon="x"></i></button></div><div id="author-content" aria-live="polite"></div><div class="about-note"><i data-icon="shield-check"></i><p>爱发电支持完全自愿，不影响软件免费使用。可免费用于商业结单，也可免费转发原版安装包。禁止倒卖、改名转售，或去掉作者介绍后再分发。完整条款见「使用授权与组件许可」。作者资料不能通过设计文件修改。</p></div><div class="dialog-actions"><button id="notices-button"><i data-icon="book-open"></i>使用授权与组件许可</button><button data-close-dialog="about-dialog">关闭</button></div></dialog>
+  <dialog id="notices-dialog" aria-labelledby="notices-title"><div class="dialog-heading"><h2 id="notices-title">使用授权与组件许可</h2><button data-close-dialog="notices-dialog" class="icon-button" aria-label="关闭许可声明"><i data-icon="x"></i></button></div><pre id="notices-content"></pre><div class="dialog-actions"><button data-close-dialog="notices-dialog">关闭</button></div></dialog>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

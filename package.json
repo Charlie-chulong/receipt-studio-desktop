@@ -1,0 +1,71 @@
+{
+  "name": "receipt-studio-desktop",
+  "productName": "小票工坊",
+  "version": "1.0.0",
+  "private": true,
+  "license": "SEE LICENSE IN SOFTWARE_LICENSE.txt",
+  "type": "module",
+  "description": "离线俱乐部结单小票工作台",
+  "author": "楚龙",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "start": "electron .",
+    "test": "node --test tests/*.test.js",
+    "prepare:desktop": "node scripts/create-icon.cjs && node scripts/create-notices.cjs",
+    "package:win": "node scripts/check-author.cjs && npm run build && npm run prepare:desktop && electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "big.js": "^7.0.1",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3",
+    "vite": "^7.0.0"
+  },
+  "build": {
+    "appId": "local.receipt.studio",
+    "productName": "小票工坊",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.png",
+      "author-profile.json",
+      "SOFTWARE_LICENSE.txt",
+      "THIRD_PARTY_NOTICES.txt",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "publish": null,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "小票工坊-${version}-安装包.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "小票工坊",
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ]
+    }
+  }
+}
