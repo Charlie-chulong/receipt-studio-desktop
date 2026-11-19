@@ -123,6 +123,10 @@ output { float: right; color: #934461; font-size: 13px; font-weight: 600; }
 .save-state { flex-shrink: 0; min-height: 42px; padding: 12px 19px; display: flex; align-items: center; gap: 8px; color: #67564d; background: #f7efdf; font-size: 12px; border-top: 1px solid var(--line); }
 .save-state .app-icon { width: 14px; height: 14px; }
 .save-state.failure { color: #a1474a; background: #fce8e6; }
+.recovery-panel { flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; margin: 16px 24px 0; padding: 16px; border: 1px solid #e4b3b1; border-radius: 9px; background: #ffedea; }
+.recovery-panel h3 { margin: 0; font-size: 14px; }
+.recovery-panel p { margin: 0; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .preview-panel { display: flex; flex-direction: column; min-height: 0; min-width: 0; background-color: #f0e8de; background-image: radial-gradient(#d9cabb 0.7px, transparent 0.7px); background-size: 15px 15px; }
 .preview-heading { display: flex; justify-content: space-between; align-items: center; padding: 25px 34px 18px; flex-shrink: 0; }
 .preview-heading h2 { font-family: "KaiTi", "SimSun", serif; font-size: 24px; font-weight: 400; }
@@ -154,6 +158,8 @@ dialog::backdrop { background: #362b2a66; backdrop-filter: blur(3px); }
 dialog > label { margin: 16px 0 12px; }
 dialog > p { font-size: 12px; line-height: 1.9; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 22px; padding-top: 15px; border-top: 1px solid var(--line); }
+#replace-design-dialog .dialog-actions, #discard-draft-dialog .dialog-actions { flex-wrap: wrap; }
+#replace-design-summary { overflow-wrap: anywhere; }
 .order-example { margin-top: 16px; padding: 14px; border: 1px dashed #d8bcaa; border-radius: 10px; background: #fff5e9; }
 .order-example-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
 .order-example-heading button { min-height: 30px; padding: 5px 10px; font-size: 11px; }

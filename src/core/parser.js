@@ -12,6 +12,8 @@ const DECIMAL = '(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?';
 const FINAL_PRICE = new RegExp(`^(.*?)\\s*(?:[¥￥]\\s*(${DECIMAL})(?:\\s*元)?|(${DECIMAL})\\s*元)\\s*$`);
 const COUPON = new RegExp(`^(?:优惠|减免)\\s*[:：]?\\s*(?:[¥￥]\\s*)?(${DECIMAL})\\s*元$`);
 const PAYMENT_FACT = /^(?:(?:已经|尚未|已|未|待)\s*)?(?:支付|付款|收款|到账|退款)/;
+const FACT_LABEL = '(?:(?:本次|本单)?(?:项目|服务|订单|消费|金额)?(?:小计|合计|总计|共计|总额|总金额|总价)|(?:已经|尚未|已|未|待|应|实)?收(?:款|到)?|收讫|到账|付款)(?:金额)?';
+const AMOUNT_FACT = new RegExp(`^${FACT_LABEL}\\s*[:：]?\\s*(?:[¥￥]\\s*${DECIMAL}(?:\\s*元)?|${DECIMAL}\\s*元)\\s*$`);
 
 export function parseOrderText(text, currentReceipt) {
   if (typeof text !== 'string') throw new Error('订单文本：请输入文本后再提取');
@@ -77,6 +79,10 @@ export function parseOrderText(text, currentReceipt) {
       } catch (error) {
         warn(index, line, error.message);
       }
+      continue;
+    }
+    if (AMOUNT_FACT.test(line)) {
+      warn(index, line, '汇总或收付款事实，未作为消费项目；请核对实际项目与金额');
       continue;
     }
     if (PAYMENT_FACT.test(line) || /^(?:老板|客户|客服|派单|账户|账号|编号|游戏|订单(?:号|编号)?|日期|时间|开始时间|结单时间|开单|已付|实付|合计|总计|应付|加急|折扣)/.test(line) || /^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/.test(line)) {

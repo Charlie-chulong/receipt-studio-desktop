@@ -1,7 +1,7 @@
 {
   "name": "receipt-studio-desktop",
   "productName": "小票工坊",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "license": "SEE LICENSE IN SOFTWARE_LICENSE.txt",
   "type": "module",

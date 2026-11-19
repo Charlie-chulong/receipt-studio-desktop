@@ -14,12 +14,19 @@
       <span class="offline-badge" role="note" title="无需联网，即可制作、编辑和导出小票。订单内容、图片素材与设计文件均在当前电脑中处理，软件不会将这些内容上传至服务器。" aria-label="本地运行，订单不上传。订单、图片与设计文件仅在本机处理。"><i data-icon="shield-check"></i>本地运行 · 订单不上传</span>
       <button id="about-button" class="quiet"><i data-icon="circle-user-round"></i>关于作者</button>
       <button id="load-design"><i data-icon="folder-open"></i>载入设计</button>
-      <button id="save-design"><i data-icon="file-down"></i>保存设计</button>
+      <button id="save-design" title="另存可编辑的 JSON 备份"><i data-icon="file-down"></i>保存设计</button>
       <button id="export-png" class="primary" disabled><i data-icon="image-down"></i><span>导出 PNG</span></button>
     </div>
   </header>
   <main class="workbench">
     <aside class="editor" aria-label="小票编辑器">
+      <section id="recovery-panel" class="recovery-panel" aria-labelledby="recovery-title" hidden>
+        <h3 id="recovery-title">原草稿已保护，尚未恢复</h3>
+        <p id="recovery-error" class="error" role="alert"></p>
+        <p>编辑、载入和自动保存已暂停，原始草稿不会被空白小票覆盖。可先下载原始备份，再重试恢复；只有明确放弃后才会开始新草稿。</p>
+        <div class="recovery-actions"><button id="retry-recovery">重试恢复</button><button id="backup-draft"><i data-icon="file-down"></i>下载原始草稿备份</button><button id="discard-draft" class="quiet danger">放弃原草稿…</button></div>
+        <p id="recovery-action-status" role="status" hidden></p>
+      </section>
       <div class="editor-intro"><div><p class="eyebrow">YOUR RECEIPT, YOUR WAY</p><h2>今天，也认真结单。</h2></div><span class="step-label">编辑 / 01</span></div>
       <div class="editor-scroll">
         <button id="extract-button" class="extract-button"><i data-icon="clipboard-list"></i><span><strong>从订单文字开始</strong><small>粘贴聊天记录，确认后填入</small></span><i data-icon="arrow-up-right"></i></button>
@@ -123,6 +130,19 @@
     <div class="dialog-actions"><button data-close-dialog="extract-dialog">取消</button><button id="apply-candidate" class="primary" disabled>确认，应用这些内容</button></div>
   </dialog>
   <dialog id="reset-dialog" aria-labelledby="reset-title"><div class="dialog-heading"><h2 id="reset-title">重新开始一张小票？</h2><button data-close-dialog="reset-dialog" class="icon-button" aria-label="关闭重置确认"><i data-icon="x"></i></button></div><p>当前订单和图片将被清空。请先保存设计 JSON，保留需要的内容。</p><div class="dialog-actions"><button data-close-dialog="reset-dialog">保留当前内容</button><button id="confirm-reset" class="primary">确认清空</button></div></dialog>
+  <dialog id="replace-design-dialog" aria-labelledby="replace-design-title" aria-describedby="replace-design-summary replace-design-detail">
+    <div class="dialog-heading"><h2 id="replace-design-title">替换当前设计？</h2><button data-close-dialog="replace-design-dialog" class="icon-button" aria-label="取消载入设计"><i data-icon="x"></i></button></div>
+    <p id="replace-design-summary"></p>
+    <p id="replace-design-detail">本机只自动保存一份当前草稿。替换后，自动草稿也会更新；需要保留当前内容时，请先另存设计 JSON，并确认文件已保存。</p>
+    <p id="replace-backup-hint" class="helper" hidden>当前有无效输入；请取消载入并修正后，再另存当前设计。</p>
+    <p id="replace-design-error" class="error" role="alert" hidden></p>
+    <div class="dialog-actions"><button id="backup-current-design"><i data-icon="file-down"></i>先另存当前设计</button><button id="cancel-replace-design" data-close-dialog="replace-design-dialog" autofocus>取消，保留当前设计</button><button id="confirm-replace-design" class="primary">替换当前设计</button></div>
+  </dialog>
+  <dialog id="discard-draft-dialog" aria-labelledby="discard-draft-title" aria-describedby="discard-draft-detail">
+    <div class="dialog-heading"><h2 id="discard-draft-title">放弃无法恢复的原草稿？</h2><button data-close-dialog="discard-draft-dialog" class="icon-button" aria-label="保留原草稿"><i data-icon="x"></i></button></div>
+    <p id="discard-draft-detail">此操作会解除保护，并用新的空白草稿替换本机原始记录，之后将恢复自动保存。若要保留原始数据，请先取消并下载原始草稿备份。</p>
+    <div class="dialog-actions"><button id="cancel-discard-draft" data-close-dialog="discard-draft-dialog" autofocus>取消，保留原草稿</button><button id="confirm-discard-draft" class="primary">放弃原草稿，重新开始</button></div>
+  </dialog>
   <dialog id="about-dialog" aria-labelledby="about-title"><div class="dialog-heading"><div><p class="eyebrow">BEHIND THE PAPER</p><h2 id="about-title">关于作者</h2></div><button data-close-dialog="about-dialog" class="icon-button" aria-label="关闭关于作者"><i data-icon="x"></i></button></div><div id="author-content" aria-live="polite"></div><div class="about-note"><i data-icon="shield-check"></i><p>爱发电支持完全自愿，不影响软件免费使用。可免费用于商业结单，也可免费转发原版安装包。禁止倒卖、改名转售，或去掉作者介绍后再分发。完整条款见「使用授权与组件许可」。作者资料不能通过设计文件修改。</p></div><div class="dialog-actions"><button id="notices-button"><i data-icon="book-open"></i>使用授权与组件许可</button><button data-close-dialog="about-dialog">关闭</button></div></dialog>
   <dialog id="notices-dialog" aria-labelledby="notices-title"><div class="dialog-heading"><h2 id="notices-title">使用授权与组件许可</h2><button data-close-dialog="notices-dialog" class="icon-button" aria-label="关闭许可声明"><i data-icon="x"></i></button></div><pre id="notices-content"></pre><div class="dialog-actions"><button data-close-dialog="notices-dialog">关闭</button></div></dialog>
   <script type="module" src="/src/main.js"></script>

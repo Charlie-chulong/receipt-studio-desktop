@@ -5,17 +5,19 @@ import { calculateReceipt } from './core/money.js';
 import { parseOrderText } from './core/parser.js';
 import { renderReceipt } from './core/render.js';
 import { loadDraft, saveDraft } from './storage.js';
+import { DraftSession } from './draft-session.js';
 
 const iconNames = ['receipt-text', 'shield-check', 'circle-user-round', 'folder-open', 'file-down', 'image-down', 'clipboard-list', 'arrow-up-right', 'notebook-pen', 'list-plus', 'plus', 'calculator', 'palette', 'image-plus', 'upload', 'x', 'message-square-text', 'rotate-ccw', 'hard-drive', 'scan-line', 'scan-text', 'book-open', 'trash-2', 'chevron-up', 'chevron-down', 'copy', 'external-link'];
 const iconPositions = new Map(iconNames.map((name, index) => [name, `${(index % 6) * 20}% ${Math.floor(index / 6) * 25}%`]));
 const $ = (id) => document.getElementById(id);
 const bridge = window.receiptDesktop;
 const MAX_URL = 12 * 1024 * 1024;
-const MAX_DESIGN = 66 * 1024 * 1024;
+const draftSession = new DraftSession({ load: loadDraft, save: saveDraft }, validateAllAssets);
 let receipt = createDefaultReceipt();
 let revision = 0;
 let renderedRevision = -1;
 let persistedRevision = 0;
+let pristineRevision = 0;
 let renderedCanvas = null;
 let renderPromise = null;
 let renderError = '';
@@ -27,6 +29,9 @@ let initialized = false;
 let exportBusy = false;
 let uploadTarget = null;
 let candidate = null;
+let pendingDesign = null;
+let recoveryBusy = false;
+let resetRevision = null;
 let notificationTimer;
 let authorPromise;
 
@@ -192,14 +197,27 @@ function renderStickers() {
   refreshIcons();
 }
 function updateExportButton() {
-  $('export-png').disabled = !initialized || exportBusy || !currentValid || Boolean(renderError) || renderedRevision !== revision || Boolean(renderPromise);
-  $('save-design').disabled = !initialized || exportBusy || !currentValid;
+  const unavailable = !initialized || exportBusy || draftSession.blocked || recoveryBusy;
+  $('export-png').disabled = unavailable || !currentValid || Boolean(renderError) || renderedRevision !== revision || Boolean(renderPromise);
+  $('save-design').disabled = unavailable || !currentValid;
+  $('backup-current-design').disabled = unavailable || !currentValid;
+  $('replace-backup-hint').hidden = Boolean(currentValid);
 }
 function saveStatus(text, failure = false) {
   $('save-status').textContent = text;
   $('save-status').parentElement.classList.toggle('failure', failure);
 }
+function canEdit() { return initialized && !exportBusy && !draftSession.blocked && !recoveryBusy; }
+function updateEditingState() {
+  document.querySelector('.editor-scroll').inert = !canEdit();
+  $('load-design').disabled = !canEdit();
+  $('extract-button').disabled = !canEdit();
+  $('recovery-panel').hidden = !initialized || !draftSession.blocked;
+  for (const id of ['retry-recovery', 'backup-draft', 'discard-draft', 'confirm-discard-draft']) $(id).disabled = recoveryBusy;
+  updateExportButton();
+}
 function enqueueSave(normalized) {
+  if (draftSession.blocked) return;
   clearTimeout(saveTimer);
   saveStatus('尚未保存 · 正在等待输入结束');
   const targetRevision = revision;
@@ -219,7 +237,7 @@ async function drainSaves() {
       if (pending.revision !== revision) continue;
       saveStatus('正在保存到本机…');
       try {
-        const date = await saveDraft(pending.receipt);
+        const date = await draftSession.save(pending.receipt);
         persistedRevision = pending.revision;
         if (pending.revision === revision) saveStatus(`已保存到本机 · ${new Date(date).toLocaleTimeString('zh-CN', { hour12: false })}`);
       } catch (error) {
@@ -230,6 +248,16 @@ async function drainSaves() {
 }
 function changed({ persist = true } = {}) {
   revision += 1;
+  if (pendingDesign && pendingDesign.revision !== revision) {
+    $('confirm-replace-design').disabled = true;
+    $('replace-design-error').textContent = '当前设计已变化，未替换。请取消后重新选择文件。';
+    $('replace-design-error').hidden = false;
+  }
+  if (candidate && candidate.revision !== revision) {
+    invalidateCandidate();
+    $('parse-error').textContent = '当前设计已变化，请重新提取并核对内容。';
+    $('parse-error').hidden = false;
+  }
   currentValid = null;
   renderError = '';
   clearTimeout(saveTimer);
@@ -308,6 +336,7 @@ async function drainRenders() {
   }
 }
 function applyReceipt(next) {
+  if (!canEdit()) throw new Error('当前不可编辑，请先处理草稿恢复或等待导出结束');
   receipt = next;
   bindFields();
   renderItems();
@@ -328,16 +357,22 @@ function downloadBlob(blob, filename) {
   anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
+function saveDesign() {
+  try {
+    if (!canEdit()) throw new Error('请先处理草稿恢复或等待导出结束');
+    const normalized = validateReceipt(receipt);
+    calculateReceipt(normalized);
+    downloadBlob(new Blob([JSON.stringify(normalized, null, 2)], { type: 'application/json' }), safeFilename('json'));
+    report('设计 JSON 下载已发起；请确认文件保存位置');
+  } catch (error) { report(`设计无法保存：${errorMessage(error)}`, true); }
+}
 function lockEditing(locked) {
   exportBusy = locked;
-  document.querySelector('.editor-scroll').inert = locked;
-  $('load-design').disabled = locked || !initialized;
-  $('extract-button').disabled = locked;
+  updateEditingState();
   $('export-png').querySelector('span').textContent = locked ? '正在导出…' : '导出 PNG';
-  updateExportButton();
 }
 async function exportPng() {
-  if (exportBusy || !currentValid) return;
+  if (!canEdit() || !currentValid) return;
   lockEditing(true);
   try {
     while (renderPromise) await renderPromise;
@@ -506,7 +541,7 @@ for (const [id, preset] of Object.entries(RECEIPT_THEMES)) {
 }
 
 for (const input of document.querySelectorAll('[data-field]')) input.addEventListener('input', () => {
-  if (!initialized || exportBusy) return;
+  if (!canEdit()) return;
   if (input.type === 'radio' && !input.checked) return;
   const value = input.type === 'checkbox' ? input.checked : input.type === 'range' ? Number(input.value) : input.value;
   if (input.dataset.field === 'theme') {
@@ -517,15 +552,17 @@ for (const input of document.querySelectorAll('[data-field]')) input.addEventLis
 });
 $('item-list').addEventListener('input', (event) => {
   const input = event.target;
+  if (!canEdit()) return;
   const item = receipt.items.find((entry) => entry.id === input.dataset.itemId);
-  if (!item || exportBusy) return;
+  if (!item) return;
   item[input.dataset.itemField] = input.value;
   changed();
 });
 $('sticker-list').addEventListener('input', (event) => {
   const input = event.target;
+  if (!canEdit()) return;
   const sticker = receipt.stickers.find((entry) => entry.id === input.dataset.stickerId);
-  if (!sticker || exportBusy) return;
+  if (!sticker) return;
   const field = input.dataset.stickerField;
   sticker[field] = Number(input.value);
   input.parentElement.querySelector('output').textContent = field === 'rotation' ? `${sticker[field]}°` : `${Math.round(sticker[field] * 100)}%`;
@@ -533,7 +570,7 @@ $('sticker-list').addEventListener('input', (event) => {
 });
 for (const kind of ['item', 'sticker']) $(kind === 'item' ? 'item-list' : 'sticker-list').addEventListener('click', (event) => {
   const button = event.target.closest('button[data-action]');
-  if (!button || exportBusy) return;
+  if (!button || !canEdit()) return;
   const entries = kind === 'item' ? receipt.items : receipt.stickers;
   const index = entries.findIndex((entry) => entry.id === button.dataset.id);
   if (index < 0) return;
@@ -550,18 +587,20 @@ for (const kind of ['item', 'sticker']) $(kind === 'item' ? 'item-list' : 'stick
   changed();
 });
 $('add-item').addEventListener('click', () => {
-  if (receipt.items.length >= 80) return;
+  if (!canEdit() || receipt.items.length >= 80) return;
   receipt.items.push({ id: newId(), name: '', amount: '0.00' });
   renderItems();
   changed();
   $('item-list').lastElementChild.querySelector('textarea').focus();
 });
 for (const button of document.querySelectorAll('[data-upload]')) button.addEventListener('click', () => {
+  if (!canEdit()) return;
   uploadTarget = button.dataset.upload;
   $('image-file').value = '';
   $('image-file').click();
 });
 for (const button of document.querySelectorAll('[data-remove-asset]')) button.addEventListener('click', () => {
+  if (!canEdit()) return;
   if (button.dataset.removeAsset === 'background') receipt.background.dataUrl = null;
   else receipt[button.dataset.removeAsset] = null;
   changed();
@@ -569,11 +608,11 @@ for (const button of document.querySelectorAll('[data-remove-asset]')) button.ad
 $('image-file').addEventListener('change', async () => {
   const file = $('image-file').files[0];
   const target = uploadTarget;
-  if (!file || !target) return;
+  if (!file || !target || !canEdit()) return;
   const startRevision = revision;
   try {
     const dataUrl = await readImage(file);
-    if (exportBusy) throw new Error('正在导出，请稍后重新添加图片');
+    if (!canEdit()) throw new Error('当前不可编辑，请处理草稿恢复或等待导出结束后重新添加图片');
     if (revision !== startRevision) throw new Error('读取期间设计已改变，请重新选择图片');
     const next = structuredClone(receipt);
     if (target === 'sticker') {
@@ -589,31 +628,57 @@ $('image-file').addEventListener('change', async () => {
     report('图片已添加，正在更新小票');
   } catch (error) { report(`图片未添加：${errorMessage(error)}`, true); }
 });
-$('load-design').addEventListener('click', () => { $('design-file').value = ''; $('design-file').click(); });
+$('load-design').addEventListener('click', () => {
+  if (!canEdit()) return;
+  $('design-file').value = '';
+  $('design-file').click();
+});
 $('design-file').addEventListener('change', async () => {
   const file = $('design-file').files[0];
-  if (!file) return;
-  const startRevision = revision;
+  if (!file || !canEdit()) return;
   try {
-    if (file.size > MAX_DESIGN) throw new Error('设计文件超过 66MB 上限');
-    const normalized = validateReceipt(JSON.parse(await file.text()));
-    calculateReceipt(normalized);
-    await validateAllAssets(normalized);
-    if (revision !== startRevision || exportBusy) throw new Error('读取期间当前设计发生变化，请重新选择文件');
-    applyReceipt(normalized);
-    report('设计已载入，正在生成完整预览');
+    const pending = await draftSession.readImport(file, revision, () => revision, revision !== pristineRevision);
+    if (!canEdit()) throw new Error('当前不可编辑，请稍后重新选择文件');
+    if (pending.needsConfirmation) {
+      pendingDesign = pending;
+      $('replace-design-summary').textContent = `将载入「${file.name}」，替换当前「${receipt.title || '未命名小票'}」的订单、样式和图片。`;
+      $('replace-design-error').hidden = true;
+      $('confirm-replace-design').disabled = false;
+      updateExportButton();
+      openDialog('replace-design-dialog');
+    } else {
+      applyReceipt(draftSession.acceptImport(pending, revision));
+      report('设计已载入，正在生成完整预览');
+    }
   } catch (error) { report(`载入失败，当前设计未改变：${errorMessage(error)}`, true); }
 });
-$('save-design').addEventListener('click', () => {
+$('confirm-replace-design').addEventListener('click', () => {
+  if (!pendingDesign) return;
   try {
-    const normalized = validateReceipt(receipt);
-    calculateReceipt(normalized);
-    downloadBlob(new Blob([JSON.stringify(normalized, null, 2)], { type: 'application/json' }), safeFilename('json'));
-    report('设计 JSON 下载已发起；请确认文件保存位置');
-  } catch (error) { report(`设计无法保存：${errorMessage(error)}`, true); }
+    if (!canEdit()) throw new Error('当前不可编辑，请稍后重新选择文件');
+    const next = draftSession.acceptImport(pendingDesign, revision);
+    pendingDesign = null;
+    closeDialog('replace-design-dialog');
+    applyReceipt(next);
+    report('已替换当前设计，正在保存到本机');
+  } catch (error) {
+    $('confirm-replace-design').disabled = true;
+    $('replace-design-error').textContent = errorMessage(error);
+    $('replace-design-error').hidden = false;
+  }
 });
+$('replace-design-dialog').addEventListener('close', () => {
+  pendingDesign = null;
+  draftSession.cancelImport();
+});
+$('save-design').addEventListener('click', saveDesign);
+$('backup-current-design').addEventListener('click', saveDesign);
 $('export-png').addEventListener('click', () => { void exportPng(); });
-$('extract-button').addEventListener('click', () => { invalidateCandidate(); openDialog('extract-dialog'); });
+$('extract-button').addEventListener('click', () => {
+  if (!canEdit()) return;
+  invalidateCandidate();
+  openDialog('extract-dialog');
+});
 $('order-text').addEventListener('input', invalidateCandidate);
 $('fill-order-example').addEventListener('click', () => {
   if ($('order-text').value.trim()) {
@@ -625,6 +690,7 @@ $('fill-order-example').addEventListener('click', () => {
   $('order-text').focus();
 });
 $('parse-text').addEventListener('click', () => {
+  if (!canEdit()) return;
   invalidateCandidate();
   try {
     const text = $('order-text').value.trim();
@@ -634,7 +700,7 @@ $('parse-text').addEventListener('click', () => {
     calculateReceipt(result.receipt);
     showCandidate(result);
     if (result.recognized <= 0) throw new Error('未识别到明确的订单字段；请手动填写，或补充字段标签与“元”单位');
-    candidate = result.receipt;
+    candidate = { receipt: result.receipt, revision };
     $('apply-candidate').disabled = false;
   } catch (error) {
     $('parse-error').textContent = errorMessage(error);
@@ -642,18 +708,36 @@ $('parse-text').addEventListener('click', () => {
   }
 });
 $('apply-candidate').addEventListener('click', () => {
-  if (!candidate) return;
-  applyReceipt(candidate);
+  if (!candidate || !canEdit()) return;
+  if (candidate.revision !== revision) {
+    invalidateCandidate();
+    $('parse-error').textContent = '当前设计已变化，请重新提取并核对内容。';
+    $('parse-error').hidden = false;
+    return;
+  }
+  const next = candidate.receipt;
   candidate = null;
+  applyReceipt(next);
   closeDialog('extract-dialog');
   report('已应用提取内容，请继续核对或编辑');
 });
-$('reset-receipt').addEventListener('click', () => openDialog('reset-dialog'));
+$('reset-receipt').addEventListener('click', () => {
+  if (!canEdit()) return;
+  resetRevision = revision;
+  openDialog('reset-dialog');
+});
 $('confirm-reset').addEventListener('click', () => {
+  if (!canEdit() || resetRevision === null) return;
+  if (resetRevision !== revision) {
+    closeDialog('reset-dialog');
+    report('确认期间当前设计已变化，未清空；请重新确认', true);
+    return;
+  }
   applyReceipt(createDefaultReceipt());
   closeDialog('reset-dialog');
   report('已清空，准备输入新订单');
 });
+$('reset-dialog').addEventListener('close', () => { resetRevision = null; });
 for (const button of document.querySelectorAll('[data-close-dialog]')) button.addEventListener('click', () => closeDialog(button.dataset.closeDialog));
 $('extract-dialog').addEventListener('close', () => { candidate = null; });
 $('about-button').addEventListener('click', () => { void showAuthor(); });
@@ -673,35 +757,81 @@ window.addEventListener('beforeunload', (event) => {
   }
 });
 
-async function initialize() {
-  document.querySelector('.editor-scroll').inert = true;
-  $('load-design').disabled = true;
-  $('save-design').disabled = true;
-  refreshIcons();
-  let restored = false;
-  try {
-    const draft = await loadDraft();
-    if (draft) {
-      const normalized = validateReceipt(draft.receipt);
-      calculateReceipt(normalized);
-      await validateAllAssets(normalized);
-      receipt = normalized;
-      restored = true;
-      const date = new Date(draft.savedAt);
-      saveStatus(`已恢复本机草稿${Number.isNaN(date.getTime()) ? '' : ` · ${date.toLocaleString('zh-CN', { hour12: false })}`}`);
-    } else saveStatus('首次使用 · 还没有本机草稿');
-  } catch (error) {
-    saveStatus(`草稿未恢复：${errorMessage(error)}`, true);
-    report('本机草稿未能恢复，保留原存储不覆盖；编辑后将保存新内容。', true);
-  }
+function showRecoveredDraft(draft) {
+  receipt = draft ? draft.receipt : createDefaultReceipt();
   bindFields();
   renderItems();
   renderStickers();
-  initialized = true;
-  document.querySelector('.editor-scroll').inert = false;
-  $('load-design').disabled = false;
   changed({ persist: false });
   persistedRevision = revision;
-  if (restored) $('preview-state').textContent = '正在恢复整张小票与图片…';
+  pristineRevision = revision;
+  if (draft) {
+    const date = new Date(draft.savedAt);
+    saveStatus(`已恢复本机草稿${Number.isNaN(date.getTime()) ? '' : ` · ${date.toLocaleString('zh-CN', { hour12: false })}`}`);
+    $('preview-state').textContent = '正在恢复整张小票与图片…';
+  } else saveStatus('首次使用 · 还没有本机草稿');
+}
+function showRecoveryFailure(error) {
+  $('recovery-error').textContent = `恢复失败：${errorMessage(error)}`;
+  saveStatus('草稿未恢复 · 已锁定编辑与自动保存', true);
+  report('原始草稿仍在本机保留。请重试恢复、下载原始备份，或明确放弃后重新开始。', true);
+}
+$('retry-recovery').addEventListener('click', async () => {
+  if (!draftSession.blocked || recoveryBusy) return;
+  recoveryBusy = true;
+  $('recovery-action-status').hidden = true;
+  updateEditingState();
+  try {
+    const draft = await draftSession.recover();
+    showRecoveredDraft(draft);
+    report(draft ? '本机草稿已恢复，可以继续编辑' : '未找到本机草稿，可以开始编辑');
+  } catch (error) { showRecoveryFailure(error); }
+  finally {
+    recoveryBusy = false;
+    updateEditingState();
+  }
+});
+$('backup-draft').addEventListener('click', async () => {
+  if (!draftSession.blocked || recoveryBusy) return;
+  recoveryBusy = true;
+  updateEditingState();
+  try {
+    const json = await draftSession.recoveryBackup();
+    downloadBlob(new Blob([json], { type: 'application/json' }), `小票工坊-原始草稿备份-${new Date().toISOString().slice(0, 10)}.json`);
+    $('recovery-action-status').textContent = '原始草稿备份下载已发起，请确认保存位置。备份保留原始记录；损坏的素材仍需修复后才能载入。';
+    $('recovery-action-status').classList.remove('error');
+  } catch (error) {
+    $('recovery-action-status').textContent = `备份未完成：${errorMessage(error)}。原始存储仍保留。`;
+    $('recovery-action-status').classList.add('error');
+  } finally {
+    $('recovery-action-status').hidden = false;
+    recoveryBusy = false;
+    updateEditingState();
+  }
+});
+$('discard-draft').addEventListener('click', () => {
+  if (!draftSession.blocked || recoveryBusy) return;
+  openDialog('discard-draft-dialog');
+});
+$('confirm-discard-draft').addEventListener('click', () => {
+  if (!draftSession.blocked || recoveryBusy) return;
+  draftSession.discardRecovery();
+  closeDialog('discard-draft-dialog');
+  updateEditingState();
+  applyReceipt(createDefaultReceipt());
+  report('已明确放弃原草稿，新的空白草稿将自动保存到本机');
+});
+
+async function initialize() {
+  updateEditingState();
+  refreshIcons();
+  try {
+    showRecoveredDraft(await draftSession.recover());
+  } catch (error) {
+    showRecoveredDraft(null);
+    showRecoveryFailure(error);
+  }
+  initialized = true;
+  updateEditingState();
 }
 void initialize();

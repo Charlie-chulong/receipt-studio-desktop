@@ -27,12 +27,14 @@ Changing a preset changes styling, not the order, amounts, or uploaded artwork. 
 ## Download and install
 
 1. Open [Releases](https://github.com/Charlie-chulong/receipt-studio-desktop/releases/latest).
-2. Download `Receipt-Studio-1.0.0-Setup.exe`, or the share ZIP containing the installer, documentation in all three languages, and license files.
+2. Download `Receipt-Studio-1.0.1-Setup.exe`. To share the installer with the documentation in all three languages and the license files, download `Receipt-Studio-1.0.1-Share.zip`.
 3. Run the installer on Windows x64, choose an installation directory, and launch “小票工坊”.
 
-The installer includes the runtime. Normal use does not require Node.js, npm, or Git. The first public installer is not code-signed, so Windows may warn about an unknown publisher. Download from this repository's Releases and compare the file hash with `SHA256SUMS.txt`; do not disable security protection to install it.
+The installer includes the runtime. You do not need Node.js, npm, or Git. This installer is not code-signed, so Windows may warn about an unknown publisher. Download it from this repository's Releases and compare its hash with `SHA256SUMS.txt`; do not disable security protection to install it.
 
 This release provides a Windows x64 installer only. No macOS, Linux, Windows ARM64, or mobile package is provided.
+
+**Fixed in 1.0.1:** Pasted subtotals and amounts received no longer count as extra services. You can keep your current draft when importing a design. If a damaged image prevents recovery, autosave pauses so you can back up the original draft.
 
 ## Basic workflow
 
@@ -58,7 +60,7 @@ This is fictional demonstration data, not a real order:
 微信支付
 ```
 
-The expected amount is `168 + 66 - 18 = 216.00` yuan. Each line must end with the **total for that line**, using `元` or a currency symbol. Duration is not multiplied again. A payment method does not establish that payment was received. Ambiguous prices, statuses, or duplicate fields require review. The parser currently recognizes explicit Chinese labels; it is not an AI chat-understanding service.
+The expected amount is `168 + 66 - 18 = 216.00` yuan. Each line must end with the **total for that line**, using `元` or a currency symbol. Duration is not multiplied again. Summary or payment facts such as `小计100元` (subtotal), `已收100元` (received), and `实收100元` (actually received) generate review warnings rather than extra items, and do not change payment status. A payment method does not establish that payment was received. Ambiguous prices, statuses, or duplicate fields require review. Pasting still requires a preview and explicit confirmation. The parser currently recognizes explicit Chinese labels; it is not an AI chat-understanding service.
 
 ### Amounts and images
 
@@ -73,6 +75,10 @@ The expected amount is `168 + 66 - 18 = 216.00` yuan. Each line must end with th
 Receipt creation, editing, and export work without an internet connection. Order contents, image assets, and design files are processed on the current computer; the application does not upload them to a server.
 
 The current draft is stored in local application data for the current Windows user. Export JSON designs for migration, backups, or separate orders: autosave is not an order-history database or a backup service. A JSON design can contain images and order information, so review it before sharing.
+
+There is only one autosaved draft. Before a valid imported JSON replaces a saved or edited design, choose “取消，保留当前设计” to cancel, “先另存当前设计” to save a separate copy first, or “替换当前设计” to replace it. Editing the current design while the file is being read or confirmation is pending invalidates that import; select the file again.
+
+If a draft or its artwork cannot be restored, editing, import, and autosave remain locked to protect the original `current` record, including after closing and reopening the application. Choose “重试恢复” to retry, or “下载原始草稿备份” to save the raw record to a location chosen in the file-save dialog (the browser preview uses the browser's download/save-as settings). This backup is a local JSON record containing `receipt` and `savedAt`; damaged data must still be repaired before it can be loaded. Creating a backup does not unlock editing. Only explicitly confirming “放弃原草稿，重新开始” replaces the protected record with a blank draft and resumes autosave. Use the regular “保存设计” button for normal design backups. Both kinds of JSON are generated locally and can contain order details and images; store them securely.
 
 The repository contains the fixed author profile distributed with the application. It does not contain end-user drafts, order files, or local acceptance-test directories. The application does not process payments, hold funds, synchronize orders to the cloud, or issue tax invoices.
 

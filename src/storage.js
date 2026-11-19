@@ -31,9 +31,12 @@ export async function loadDraft() {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readonly');
     const request = transaction.objectStore(STORE).get(KEY);
-    let result = null;
-    request.onsuccess = () => { result = request.result || null; };
-    transaction.oncomplete = () => resolve(result);
+    let result;
+    let exists = false;
+    const presence = transaction.objectStore(STORE).count(KEY);
+    request.onsuccess = () => { result = request.result; };
+    presence.onsuccess = () => { exists = presence.result > 0; };
+    transaction.oncomplete = () => resolve({ exists, value: result });
     transaction.onabort = () => reject(transaction.error || new Error('读取草稿失败'));
     transaction.onerror = () => reject(transaction.error || new Error('读取草稿失败'));
   });

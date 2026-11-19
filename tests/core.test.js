@@ -241,6 +241,38 @@ test('payment and refund facts at different stages never become service charges'
   assert.equal(result.receipt.paymentMethod, '');
 });
 
+test('explicit subtotals and received amounts warn without adding charges or changing payment facts', () => {
+  const facts = [
+    '小计100元', '小计：￥100.00', '共计 100元', '总额100元', '总金额：100元', '总价¥100',
+    '项目合计100元', '消费合计100元', '金额合计100元', '合计100元', '总计100元',
+    '应收100元', '实收100元', '已收100元', '未收100元', '待收100元',
+    '收到100元', '已收到100元', '收讫100元', '收款金额100元', '到账金额100元', '付款金额100元',
+    '实收金额100元', '应收款100元', '已经收100元', '本次小计100元', '订单总金额100元',
+  ];
+  const current = order(['99']);
+  current.paymentMethod = '支付宝';
+  const before = structuredClone(current);
+  const result = parseOrderText(`陪玩100元\n${facts.join('\n')}`, current);
+  assert.equal(result.recognized, 1);
+  assert.deepEqual(result.receipt.items.map(({ name, amount }) => ({ name, amount })), [{ name: '陪玩', amount: '100.00' }]);
+  assert.equal(calculateReceipt(result.receipt).total, '100.00');
+  assert.equal(result.receipt.paymentMethod, '支付宝');
+  assert.deepEqual(result.receipt.fees, current.fees);
+  assert.equal(result.warnings.length, facts.length);
+  assert.deepEqual(current, before);
+  const factsOnly = parseOrderText(facts.join('\n'), current);
+  assert.equal(factsOnly.recognized, 0);
+  assert.deepEqual(factsOnly.receipt, validateReceipt(current));
+});
+
+test('summary and collection words inside actual service names remain ordinary line totals', () => {
+  const result = parseOrderText('小计报表整理100元\n已收集资料整理50元\n应收账款核对80元', createDefaultReceipt());
+  assert.equal(result.recognized, 3);
+  assert.deepEqual(result.warnings, []);
+  assert.deepEqual(result.receipt.items.map(item => item.name), ['小计报表整理', '已收集资料整理', '应收账款核对']);
+  assert.equal(calculateReceipt(result.receipt).total, '230.00');
+});
+
 test('parser duplicates do not silently sum coupons or replace first payment method', () => {
   const result = parseOrderText('优惠10元\n减免20元\n现金\n微信支付', order(['100']));
   assert.equal(result.recognized, 2);
